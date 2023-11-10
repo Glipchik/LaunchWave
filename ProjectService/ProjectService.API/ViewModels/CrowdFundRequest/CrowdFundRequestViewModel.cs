@@ -1,10 +1,10 @@
-﻿using ProjectService.DAL.Entities.Base;
-using ProjectService.Domain.Enums;
+﻿using ProjectService.Domain.Enums;
 
-namespace ProjectService.DAL.Entities;
+namespace ProjectService.API.ViewModels.CrowdFundRequest;
 
-public class CrowdFundRequestEntity : EntityWithId
+public class CrowdFundRequestViewModel
 {
+    public Guid Id { get; set; }
     public decimal CrowdFundingAmount { get; set; }
     public string RequestedBy { get; set; } = string.Empty;
     public CrowdFundRequestStatus Status { get; set; }

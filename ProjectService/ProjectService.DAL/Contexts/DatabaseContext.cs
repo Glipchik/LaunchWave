@@ -2,6 +2,7 @@
 using ProjectService.DAL.Constants;
 using ProjectService.DAL.Entities;
 using ProjectService.DAL.Entities.Base;
+using ProjectService.DAL.Interceptors;
 using Z.EntityFramework.Plus;
 
 namespace ProjectService.DAL.Contexts;
@@ -37,6 +38,17 @@ public sealed class DatabaseContext : DbContext
         }
     }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        => optionsBuilder.AddInterceptors(new SoftDeleteInterceptor());
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Automatically adding query filter to 
+        // all LINQ queries that use Projects
+        modelBuilder.Entity<ProjectEntity>()
+            .HasQueryFilter(x => x.IsDeleted == false);
+    }
+
     public override int SaveChanges()
     {
         OnBeforeSaving();
@@ -61,27 +73,6 @@ public sealed class DatabaseContext : DbContext
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         OnBeforeSaving();
-        var audit = new Audit
-        {
-            CreatedBy = AuthorConstants.CreatedByApplication
-        };
-
-        audit.PreSaveChanges(this);
-        var rowsAffected = await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        audit.PostSaveChanges();
-
-        if (audit.Configuration.AutoSavePreAction != null)
-        {
-            audit.Configuration.AutoSavePreAction(this, audit);
-            await base.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        return rowsAffected;
-    }
-
-    public async Task<int> SaveChangesAsyncExcludingUpdatedAt(CancellationToken cancellationToken = default)
-    {
-        OnBeforeSaving(excludeUpdatedAt: true);
         var audit = new Audit
         {
             CreatedBy = AuthorConstants.CreatedByApplication

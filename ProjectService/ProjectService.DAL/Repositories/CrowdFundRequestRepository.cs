@@ -4,9 +4,9 @@ using ProjectService.DAL.Entities;
 
 namespace ProjectService.DAL.Repositories;
 
-internal class CrowdFundRequestEntityRepository : GenericRepository<CrowdFundRequestEntity>, ICrowdFundRequestEntityRepository
+internal class CrowdFundRequestRepository : GenericRepository<CrowdFundRequestEntity>, ICrowdFundRequestRepository
 {
-    public CrowdFundRequestEntityRepository(DatabaseContext databaseContext, 
+    public CrowdFundRequestRepository(DatabaseContext databaseContext, 
         IChangeLogGenericRepository<CrowdFundRequestEntity> changeLogGenericRepository)
         : base(databaseContext, changeLogGenericRepository)
     {
