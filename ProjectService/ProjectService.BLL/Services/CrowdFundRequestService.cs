@@ -13,10 +13,13 @@ namespace ProjectService.BLL.Services;
 public class CrowdFundRequestService : GenericService<CrowdFundRequestModel, CrowdFundRequestEntity>, ICrowdFundRequestService
 {
     private readonly IProjectService _projectService;
+    private readonly IChangeLogGenericRepository<CrowdFundRequestEntity> _changeLogRepository;
 
-    public CrowdFundRequestService(ICrowdFundRequestRepository repository, IProjectService projectService) : base(repository)
+    public CrowdFundRequestService(ICrowdFundRequestRepository repository, IProjectService projectService,
+        IChangeLogGenericRepository<CrowdFundRequestEntity> changeLogRepository) : base(repository)
     {
         _projectService = projectService;
+        _changeLogRepository = changeLogRepository;
     }
 
     public async Task<CrowdFundRequestModel> Create(CreateCrowdFundRequestModel createModel, CancellationToken ct)
@@ -35,8 +38,17 @@ public class CrowdFundRequestService : GenericService<CrowdFundRequestModel, Cro
         if (request is null)
             throw new ModelNotFoundException(nameof(request));
 
+        var changeLog = new ChangeLogEntity()
+        {
+            EntityName = typeof(CrowdFundRequestModel).ToString(),
+            PrimaryKeyValue = id.ToString(),
+            PropertyName = "Status",
+            OldValue = request.Status.ToString(),
+            NewValue = CrowdFundRequestStatus.Rejected.ToString()
+        };
+
         request.Status = CrowdFundRequestStatus.Rejected;
-        var updatedRequest = await Repository.Update(request, ct);
+        var updatedRequest = await _changeLogRepository.Update(request, changeLog, ct);
 
         return updatedRequest.Adapt<CrowdFundRequestModel>();
     }
@@ -45,22 +57,19 @@ public class CrowdFundRequestService : GenericService<CrowdFundRequestModel, Cro
     {
         var request = await Repository.GetById(id, ct);
 
-        if (request is null)
-            throw new ModelNotFoundException(nameof(request));
+        ValidateAcceptingRequest(request);
 
-        if (request.Status is CrowdFundRequestStatus.Rejected)
-            throw new InvalidStatusException(ExceptionConstants.RequestRejectedStatus);
-
-        if (request.Status is CrowdFundRequestStatus.Accepted)
+        var changeLog = new ChangeLogEntity()
         {
-            throw new InvalidStatusException(ExceptionConstants.RequestAcceptedStatus);
-        }
-
-        if (request.EndDate <= DateOnly.FromDateTime(DateTime.UtcNow))
-            throw new ExpiredDateException(ExceptionConstants.EndDateExpired);
+            EntityName = typeof(CrowdFundRequestModel).ToString(),
+            PrimaryKeyValue = id.ToString(),
+            PropertyName = "Status",
+            OldValue = request!.Status.ToString(),
+            NewValue = CrowdFundRequestStatus.Accepted.ToString()
+        };
 
         request.Status = CrowdFundRequestStatus.Accepted;
-        var updatedRequest = await Repository.Update(request, ct);
+        var updatedRequest = await _changeLogRepository.Update(request, changeLog, ct);
 
         var projectToCreate = new ProjectModel
         {
@@ -73,5 +82,22 @@ public class CrowdFundRequestService : GenericService<CrowdFundRequestModel, Cro
 
         var createdProject = await _projectService.Add(projectToCreate, ct);
         return createdProject;
+    }
+
+    private static void ValidateAcceptingRequest(CrowdFundRequestEntity? request)
+    {
+        if (request is null)
+            throw new ModelNotFoundException(nameof(request));
+
+        switch (request.Status)
+        {
+            case CrowdFundRequestStatus.Rejected:
+                throw new InvalidStatusException(ExceptionConstants.RequestRejectedStatus);
+            case CrowdFundRequestStatus.Accepted:
+                throw new InvalidStatusException(ExceptionConstants.RequestAcceptedStatus);
+        }
+
+        if (request.EndDate <= DateOnly.FromDateTime(DateTime.UtcNow))
+            throw new ExpiredDateException(ExceptionConstants.EndDateExpired);
     }
 }
